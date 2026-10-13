@@ -26,11 +26,6 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
-/**
- * Covers MVP-02 authentication: successful/failed login, anonymous access
- * rejection, protected page access once authenticated, logout, and that
- * passwords are never stored as plaintext.
- */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @ActiveProfiles("dev")
 class AuthenticationTests {

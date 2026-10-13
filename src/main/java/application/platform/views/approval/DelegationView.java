@@ -24,10 +24,6 @@ import application.platform.views.MainLayout;
 
 import jakarta.annotation.security.PermitAll;
 
-/**
- * Visual prototype of the Delegation page. Uses static mock data only -
- * Add/Edit/View/Cancel are UI affordances that do not persist anything.
- */
 @Route(value = "approval/delegation", layout = MainLayout.class)
 @PageTitle("Delegation")
 @PermitAll

@@ -2,10 +2,6 @@ package application.platform.views.approval;
 
 import java.util.List;
 
-/**
- * Static mock data for the Approval Rules prototype page. UI visualization
- * only - not backed by any persistence layer.
- */
 final class MockRuleData {
 
     static final List<MockRule> ALL = List.of(

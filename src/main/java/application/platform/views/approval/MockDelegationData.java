@@ -2,10 +2,6 @@ package application.platform.views.approval;
 
 import java.util.List;
 
-/**
- * Static mock data for the Delegation prototype page. UI visualization
- * only - not backed by any persistence layer.
- */
 final class MockDelegationData {
 
     static final List<MockDelegation> ALL = List.of(

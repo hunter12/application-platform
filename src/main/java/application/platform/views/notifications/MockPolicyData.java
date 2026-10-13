@@ -2,10 +2,6 @@ package application.platform.views.notifications;
 
 import java.util.List;
 
-/**
- * Static mock data for the Notification Policy prototype page. UI
- * visualization only - not backed by any persistence layer.
- */
 final class MockPolicyData {
 
     static final List<MockPolicy> ALL = List.of(

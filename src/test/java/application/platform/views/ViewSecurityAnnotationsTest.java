@@ -9,11 +9,6 @@ import com.vaadin.flow.server.auth.AnonymousAllowed;
 
 import jakarta.annotation.security.PermitAll;
 
-/**
- * Route access is enforced by the backend security layer, not by hiding UI
- * elements - these annotations are what {@code NavigationAccessControl}
- * reads to decide whether a view requires authentication.
- */
 class ViewSecurityAnnotationsTest {
 
     @Test

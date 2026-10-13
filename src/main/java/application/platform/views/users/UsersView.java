@@ -4,32 +4,37 @@ import java.util.List;
 
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.confirmdialog.ConfirmDialog;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.VaadinIcon;
-import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 
+import application.platform.common.BusinessException;
+import application.platform.user.UserService;
+import application.platform.user.UserSummary;
 import application.platform.views.MainLayout;
+import application.platform.views.ViewNotifications;
 
 import jakarta.annotation.security.PermitAll;
 
-/**
- * Visual prototype of the Users management page (MVP-02.5). Uses static mock
- * data only - Add/Edit/Delete are UI affordances that do not persist
- * anything.
- */
 @Route(value = "users", layout = MainLayout.class)
 @PageTitle("Users")
 @PermitAll
 public class UsersView extends VerticalLayout {
 
-    public UsersView() {
+    private final UserService userService;
+    private final Grid<UserSummary> grid = new Grid<>();
+    private final TextField search = new TextField();
+    private List<UserSummary> users = List.of();
+
+    public UsersView(UserService userService) {
+        this.userService = userService;
         setSizeFull();
         setPadding(true);
         setSpacing(true);
@@ -39,7 +44,6 @@ public class UsersView extends VerticalLayout {
         Button addUser = new Button("Add User", VaadinIcon.PLUS.create(),
                 event -> getUI().ifPresent(ui -> ui.navigate("users/add")));
 
-        TextField search = new TextField();
         search.setPlaceholder("Search");
         search.setClearButtonVisible(true);
         search.setPrefixComponent(VaadinIcon.SEARCH.create());
@@ -48,36 +52,43 @@ public class UsersView extends VerticalLayout {
         toolbar.setWidthFull();
         toolbar.setAlignItems(HorizontalLayout.Alignment.CENTER);
 
-        Grid<MockUser> grid = new Grid<>();
-        grid.setItems(MockUserData.ALL);
-        grid.addColumn(MockUser::username).setHeader("Username");
-        grid.addColumn(MockUser::name).setHeader("Name");
-        grid.addColumn(MockUser::organization).setHeader("Organization");
-        grid.addColumn(MockUser::supervisor).setHeader("Supervisor");
-        grid.addComponentColumn(user -> statusLabel(user.status())).setHeader("Status");
+        grid.addColumn(UserSummary::username).setHeader("Username");
+        grid.addColumn(UserSummary::fullName).setHeader("Name");
+        grid.addColumn(UserSummary::organizationName).setHeader("Organization");
+        grid.addColumn(user -> user.supervisorName() == null ? "-" : user.supervisorName()).setHeader("Supervisor");
+        grid.addColumn(user -> user.roleNames().isEmpty() ? "-" : String.join(", ", user.roleNames()))
+                .setHeader("Roles");
+        grid.addComponentColumn(user -> statusLabel(user.active())).setHeader("Status");
         grid.addComponentColumn(this::actionButtons).setHeader("Action");
         grid.setSizeFull();
 
-        search.addValueChangeListener(event -> grid.setItems(filter(event.getValue())));
+        search.addValueChangeListener(event -> applyFilter());
 
         add(title, toolbar, grid);
         setFlexGrow(1, grid);
+        refresh();
     }
 
-    private List<MockUser> filter(String term) {
+    private void refresh() {
+        users = userService.findAll();
+        applyFilter();
+    }
+
+    private void applyFilter() {
+        String term = search.getValue();
         if (term == null || term.isBlank()) {
-            return MockUserData.ALL;
+            grid.setItems(users);
+            return;
         }
         String needle = term.trim().toLowerCase();
-        return MockUserData.ALL.stream()
+        grid.setItems(users.stream()
                 .filter(user -> user.username().toLowerCase().contains(needle)
-                        || user.name().toLowerCase().contains(needle))
-                .toList();
+                        || user.fullName().toLowerCase().contains(needle))
+                .toList());
     }
 
-    private Component statusLabel(String status) {
-        Span label = new Span(status);
-        boolean active = "Active".equals(status);
+    private Component statusLabel(boolean active) {
+        Span label = new Span(active ? "Active" : "Inactive");
         label.getStyle()
                 .set("padding", "0.15em 0.65em")
                 .set("border-radius", "1em")
@@ -88,14 +99,27 @@ public class UsersView extends VerticalLayout {
         return label;
     }
 
-    private Component actionButtons(MockUser user) {
-        Button edit = new Button("Edit", event -> showPrototypeNotice("Editing users"));
-        Button delete = new Button("Delete", event -> showPrototypeNotice("Deleting users"));
+    private Component actionButtons(UserSummary user) {
+        Button edit = new Button("Edit",
+                event -> getUI().ifPresent(ui -> ui.navigate("users/edit/" + user.id())));
+        Button delete = new Button("Delete", event -> confirmDelete(user));
         return new HorizontalLayout(edit, delete);
     }
 
-    private void showPrototypeNotice(String action) {
-        Notification.show(action + " is a UI prototype only - no data is persisted.", 3000,
-                Notification.Position.BOTTOM_START);
+    private void confirmDelete(UserSummary user) {
+        ConfirmDialog dialog = new ConfirmDialog("Delete user",
+                "Delete user \"" + user.username() + "\"? They will no longer be able to log in.", "Delete",
+                event -> {
+                    try {
+                        userService.delete(user.id());
+                        ViewNotifications.showSuccess("User \"" + user.username() + "\" deleted");
+                    } catch (BusinessException e) {
+                        ViewNotifications.showError(e.getMessage());
+                    }
+                    refresh();
+                });
+        dialog.setCancelable(true);
+        dialog.setConfirmButtonTheme("error primary");
+        dialog.open();
     }
 }

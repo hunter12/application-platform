@@ -7,11 +7,6 @@ import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 
-/**
- * Shared rendering for the Business Modules prototype pages: a simple
- * status/records/pending/last-activity card dashboard with hardcoded
- * values. No business logic - visual prototype only.
- */
 abstract class ModuleDashboardView extends VerticalLayout {
 
     protected ModuleDashboardView(String title, String subtitle, String status, int totalRecords, int pendingItems,

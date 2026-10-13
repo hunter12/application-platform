@@ -15,3 +15,6 @@ vite.generated.ts
 
 # Local run logs
 *.log
+
+# Local H2 development database
+data/

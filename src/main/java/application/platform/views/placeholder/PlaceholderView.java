@@ -4,10 +4,6 @@ import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.Paragraph;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 
-/**
- * Shared rendering for MVP-02.5 placeholder pages: features whose business
- * logic is out of scope for this MVP and will be implemented later.
- */
 public abstract class PlaceholderView extends VerticalLayout {
 
     protected PlaceholderView(String title, String message) {

@@ -14,9 +14,6 @@ import com.vaadin.flow.router.Route;
 
 import jakarta.annotation.security.PermitAll;
 
-/**
- * Dashboard prototype (MVP-02.5). Static/mock data only - no persistence.
- */
 @Route(value = "", layout = MainLayout.class)
 @PageTitle("Dashboard")
 @PermitAll

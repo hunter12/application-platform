@@ -31,10 +31,6 @@ import application.platform.views.permissions.PermissionView;
 import application.platform.views.roles.RoleView;
 import application.platform.views.users.UsersView;
 
-/**
- * Application shell (MVP-02.5): header, sidebar navigation and content
- * outlet. Wraps every protected view via {@code @Route(layout = MainLayout.class)}.
- */
 @PermitAll
 public class MainLayout extends AppLayout implements RouterLayout {
 

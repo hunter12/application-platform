@@ -24,10 +24,6 @@ import application.platform.views.MainLayout;
 
 import jakarta.annotation.security.PermitAll;
 
-/**
- * Visual prototype of the Approval Rules page. Uses static mock data only
- * - Add/Edit/Deactivate are UI affordances that do not persist anything.
- */
 @Route(value = "approval/rules", layout = MainLayout.class)
 @PageTitle("Approval Rules")
 @PermitAll

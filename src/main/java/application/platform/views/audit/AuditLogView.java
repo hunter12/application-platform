@@ -21,10 +21,6 @@ import application.platform.views.MainLayout;
 
 import jakarta.annotation.security.PermitAll;
 
-/**
- * Visual prototype of the Audit Log page. Read-only, static mock data
- * only - View Details opens a dialog with dummy values.
- */
 @Route(value = "audit/log", layout = MainLayout.class)
 @PageTitle("Audit Log")
 @PermitAll

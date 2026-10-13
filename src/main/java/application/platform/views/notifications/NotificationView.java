@@ -23,11 +23,6 @@ import application.platform.views.MainLayout;
 
 import jakarta.annotation.security.PermitAll;
 
-/**
- * Visual prototype of the Notifications page. Uses static mock data only
- * - Mark as Read/View/Delete are UI affordances that do not persist
- * anything.
- */
 @Route(value = "notifications", layout = MainLayout.class)
 @PageTitle("Notifications")
 @PermitAll

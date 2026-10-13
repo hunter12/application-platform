@@ -7,10 +7,6 @@ import application.platform.views.MainLayout;
 
 import jakarta.annotation.security.PermitAll;
 
-/**
- * Visual prototype dashboard for Module 3. Hardcoded values only - no
- * business logic.
- */
 @Route(value = "modules/module3", layout = MainLayout.class)
 @PageTitle("Module 3")
 @PermitAll

@@ -12,19 +12,6 @@ import com.vaadin.browserless.SpringBrowserlessTest;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.spring.security.AuthenticationContext;
 
-/**
- * Reproduces the real "Log out" button click in the application shell header
- * (not a raw HTTP call) to catch regressions like the one where the button
- * navigated to a plain {@code GET /logout}, which Spring Security's
- * CSRF-protected logout filter does not match, resulting in a 403 instead of
- * a logout.
- * <p>
- * The actual logout mechanics (session invalidation, redirect to the login
- * page) are Vaadin/Spring Security internals already covered by
- * {@link application.platform.security.AuthenticationTests}; this test only
- * verifies that clicking the button triggers the correct, officially
- * supported logout entry point.
- */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @ActiveProfiles("dev")
 class DashboardLogoutTest extends SpringBrowserlessTest {

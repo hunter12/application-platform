@@ -1,6 +1,8 @@
 package application.platform.views.organization;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Stream;
 
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.button.Button;
@@ -13,22 +15,21 @@ import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.menubar.MenuBar;
 import com.vaadin.flow.component.menubar.MenuBarVariant;
-import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 
+import application.platform.common.BusinessException;
+import application.platform.organization.OrganizationService;
+import application.platform.organization.OrganizationSummary;
+import application.platform.organization.OrganizationType;
 import application.platform.views.MainLayout;
+import application.platform.views.ViewNotifications;
 
 import jakarta.annotation.security.PermitAll;
 
-/**
- * Visual prototype of the Organizations page. Uses static mock data only -
- * Add/Edit/View Hierarchy/Deactivate are UI affordances that do not persist
- * anything.
- */
 @Route(value = "organizations", layout = MainLayout.class)
 @PageTitle("Organizations")
 @PermitAll
@@ -36,7 +37,15 @@ public class OrganizationView extends VerticalLayout {
 
     private static final String FILTER_ALL = "All";
 
-    public OrganizationView() {
+    private final OrganizationService organizationService;
+    private final Grid<OrganizationSummary> grid = new Grid<>();
+    private final TextField search = new TextField();
+    private final ComboBox<String> typeFilter = new ComboBox<>();
+    private final ComboBox<String> statusFilter = new ComboBox<>();
+    private List<OrganizationSummary> organizations = List.of();
+
+    public OrganizationView(OrganizationService organizationService) {
+        this.organizationService = organizationService;
         setSizeFull();
         setPadding(true);
         setSpacing(true);
@@ -49,18 +58,15 @@ public class OrganizationView extends VerticalLayout {
         header.setPadding(false);
         header.setSpacing(false);
 
-        TextField search = new TextField();
         search.setPlaceholder("Search organization...");
         search.setClearButtonVisible(true);
         search.setPrefixComponent(VaadinIcon.SEARCH.create());
 
-        ComboBox<String> typeFilter = new ComboBox<>();
-        typeFilter.setItems(FILTER_ALL, "Head Office", "Regional", "Branch", "Division", "Department", "Section",
-                "Unit");
+        typeFilter.setItems(Stream.concat(Stream.of(FILTER_ALL),
+                Arrays.stream(OrganizationType.values()).map(OrganizationType::getLabel)).toList());
         typeFilter.setValue(FILTER_ALL);
         typeFilter.setPlaceholder("Type");
 
-        ComboBox<String> statusFilter = new ComboBox<>();
         statusFilter.setItems(FILTER_ALL, "Active", "Inactive");
         statusFilter.setValue(FILTER_ALL);
         statusFilter.setPlaceholder("Status");
@@ -73,40 +79,43 @@ public class OrganizationView extends VerticalLayout {
         toolbar.setAlignItems(HorizontalLayout.Alignment.CENTER);
         toolbar.setFlexGrow(1, search);
 
-        Grid<OrgRow> grid = new Grid<>();
-        grid.setItems(MockOrgRowData.ALL);
-        grid.addColumn(OrgRow::code).setHeader("Code");
-        grid.addColumn(OrgRow::name).setHeader("Organization Name");
-        grid.addColumn(OrgRow::type).setHeader("Type");
-        grid.addColumn(OrgRow::parent).setHeader("Parent Organization");
-        grid.addComponentColumn(row -> statusLabel(row.status())).setHeader("Status");
+        grid.addColumn(OrganizationSummary::code).setHeader("Code");
+        grid.addColumn(OrganizationSummary::name).setHeader("Organization Name");
+        grid.addColumn(org -> org.type().getLabel()).setHeader("Type");
+        grid.addColumn(org -> org.parentName() == null ? "-" : org.parentName()).setHeader("Parent Organization");
+        grid.addComponentColumn(org -> statusLabel(org.active())).setHeader("Status");
         grid.addComponentColumn(this::actionMenu).setHeader("Action");
         grid.setSizeFull();
 
-        search.addValueChangeListener(
-                event -> grid.setItems(filter(event.getValue(), typeFilter.getValue(), statusFilter.getValue())));
-        typeFilter.addValueChangeListener(
-                event -> grid.setItems(filter(search.getValue(), event.getValue(), statusFilter.getValue())));
-        statusFilter.addValueChangeListener(
-                event -> grid.setItems(filter(search.getValue(), typeFilter.getValue(), event.getValue())));
+        search.addValueChangeListener(event -> applyFilter());
+        typeFilter.addValueChangeListener(event -> applyFilter());
+        statusFilter.addValueChangeListener(event -> applyFilter());
 
         add(header, toolbar, grid);
         setFlexGrow(1, grid);
+        refresh();
     }
 
-    private List<OrgRow> filter(String term, String type, String status) {
-        String needle = term == null ? "" : term.trim().toLowerCase();
-        return MockOrgRowData.ALL.stream()
-                .filter(row -> needle.isEmpty() || row.name().toLowerCase().contains(needle)
-                        || row.code().toLowerCase().contains(needle))
-                .filter(row -> type == null || FILTER_ALL.equals(type) || row.type().equals(type))
-                .filter(row -> status == null || FILTER_ALL.equals(status) || row.status().equals(status))
-                .toList();
+    private void refresh() {
+        organizations = organizationService.findAll();
+        applyFilter();
     }
 
-    private Component statusLabel(String status) {
-        Span label = new Span(status);
-        boolean active = "Active".equals(status);
+    private void applyFilter() {
+        String needle = search.getValue() == null ? "" : search.getValue().trim().toLowerCase();
+        String type = typeFilter.getValue();
+        String status = statusFilter.getValue();
+        grid.setItems(organizations.stream()
+                .filter(org -> needle.isEmpty() || org.name().toLowerCase().contains(needle)
+                        || org.code().toLowerCase().contains(needle))
+                .filter(org -> type == null || FILTER_ALL.equals(type) || org.type().getLabel().equals(type))
+                .filter(org -> status == null || FILTER_ALL.equals(status)
+                        || org.active() == "Active".equals(status))
+                .toList());
+    }
+
+    private Component statusLabel(boolean active) {
+        Span label = new Span(active ? "Active" : "Inactive");
         label.getStyle()
                 .set("padding", "0.15em 0.65em")
                 .set("border-radius", "1em")
@@ -117,19 +126,25 @@ public class OrganizationView extends VerticalLayout {
         return label;
     }
 
-    private Component actionMenu(OrgRow row) {
+    private Component actionMenu(OrganizationSummary org) {
         MenuBar menuBar = new MenuBar();
         menuBar.addThemeVariants(MenuBarVariant.LUMO_TERTIARY_INLINE);
         MenuItem actions = menuBar.addItem(VaadinIcon.ELLIPSIS_DOTS_V.create());
         SubMenu subMenu = actions.getSubMenu();
-        subMenu.addItem("Edit", event -> showPrototypeNotice("Editing organizations"));
+        subMenu.addItem("Edit", event -> getUI().ifPresent(ui -> ui.navigate("organizations/edit/" + org.id())));
         subMenu.addItem("View Hierarchy", event -> getUI().ifPresent(ui -> ui.navigate("organizations/hierarchy")));
-        subMenu.addItem("Deactivate", event -> showPrototypeNotice("Deactivating organizations"));
+        subMenu.addItem(org.active() ? "Deactivate" : "Activate", event -> toggleActive(org));
         return menuBar;
     }
 
-    private void showPrototypeNotice(String action) {
-        Notification.show(action + " is a UI prototype only - no data is persisted.", 3000,
-                Notification.Position.BOTTOM_START);
+    private void toggleActive(OrganizationSummary org) {
+        try {
+            organizationService.setActive(org.id(), !org.active());
+            ViewNotifications.showSuccess("Organization \"" + org.name() + "\" "
+                    + (org.active() ? "deactivated" : "activated"));
+        } catch (BusinessException e) {
+            ViewNotifications.showError(e.getMessage());
+        }
+        refresh();
     }
 }

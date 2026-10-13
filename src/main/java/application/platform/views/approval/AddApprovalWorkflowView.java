@@ -25,10 +25,6 @@ import application.platform.views.MainLayout;
 
 import jakarta.annotation.security.PermitAll;
 
-/**
- * Visual prototype of the Add Approval Workflow form. Save is a UI
- * affordance that does not persist anything.
- */
 @Route(value = "approval/workflows/add", layout = MainLayout.class)
 @PageTitle("Add Approval Workflow")
 @PermitAll

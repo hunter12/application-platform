@@ -21,10 +21,6 @@ import application.platform.views.MainLayout;
 
 import jakarta.annotation.security.PermitAll;
 
-/**
- * Visual prototype of the Add Delegation form. Save is a UI affordance
- * that does not persist anything.
- */
 @Route(value = "approval/delegation/add", layout = MainLayout.class)
 @PageTitle("Add Delegation")
 @PermitAll

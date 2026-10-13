@@ -24,11 +24,6 @@ import application.platform.views.MainLayout;
 
 import jakarta.annotation.security.PermitAll;
 
-/**
- * Visual prototype of the Notification Policy page. Uses static mock data
- * only - Add/Edit/Deactivate are UI affordances that do not persist
- * anything.
- */
 @Route(value = "notifications/policy", layout = MainLayout.class)
 @PageTitle("Notification Policy")
 @PermitAll

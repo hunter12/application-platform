@@ -12,14 +12,6 @@ import com.vaadin.flow.spring.security.VaadinSecurityConfigurer;
 
 import application.platform.views.LoginView;
 
-/**
- * Local username/password authentication for the application (MVP-02).
- * <p>
- * Delegates route protection to Vaadin's {@link VaadinSecurityConfigurer},
- * which authenticates every view unless it is explicitly annotated
- * {@code @AnonymousAllowed}, and wires the login/logout flow to
- * {@link LoginView}.
- */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {

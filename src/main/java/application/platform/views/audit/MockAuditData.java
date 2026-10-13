@@ -2,10 +2,6 @@ package application.platform.views.audit;
 
 import java.util.List;
 
-/**
- * Static mock data for the Audit Log prototype page. UI visualization
- * only - not backed by any persistence layer.
- */
 final class MockAuditData {
 
     static final List<MockAuditEntry> ALL = List.of(

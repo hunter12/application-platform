@@ -24,11 +24,6 @@ import application.platform.views.MainLayout;
 
 import jakarta.annotation.security.PermitAll;
 
-/**
- * Visual prototype of the Approval Workflows page. Uses static mock data
- * only - Add/Edit/View/Deactivate are UI affordances that do not persist
- * anything.
- */
 @Route(value = "approval/workflows", layout = MainLayout.class)
 @PageTitle("Approval Workflows")
 @PermitAll

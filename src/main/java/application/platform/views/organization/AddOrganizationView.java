@@ -1,5 +1,7 @@
 package application.platform.views.organization;
 
+import java.util.List;
+
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -8,64 +10,83 @@ import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.Hr;
 import com.vaadin.flow.component.html.Span;
-import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.FlexLayout;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextField;
+import com.vaadin.flow.router.BeforeEvent;
+import com.vaadin.flow.router.HasUrlParameter;
+import com.vaadin.flow.router.OptionalParameter;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
+import com.vaadin.flow.router.RouteAlias;
 
+import application.platform.common.BusinessException;
+import application.platform.organization.OrganizationForm;
+import application.platform.organization.OrganizationService;
+import application.platform.organization.OrganizationSummary;
+import application.platform.organization.OrganizationType;
 import application.platform.views.MainLayout;
+import application.platform.views.UrlIds;
+import application.platform.views.ViewNotifications;
 
 import jakarta.annotation.security.PermitAll;
 
-/**
- * Visual prototype of the Add Organization form. Save is a UI affordance
- * that does not persist anything.
- */
 @Route(value = "organizations/add", layout = MainLayout.class)
+@RouteAlias(value = "organizations/edit", layout = MainLayout.class)
 @PageTitle("Add Organization")
 @PermitAll
-public class AddOrganizationView extends VerticalLayout {
+public class AddOrganizationView extends VerticalLayout implements HasUrlParameter<String> {
 
-    public AddOrganizationView() {
+    private static final String ACTIVE = "Active";
+
+    private final OrganizationService organizationService;
+    private final List<OrganizationSummary> organizations;
+
+    private final H2 title = new H2("Add Organization");
+    private final Span subtitle = new Span("Create a new organizational unit");
+    private final TextField name = new TextField("Organization Name");
+    private final TextField code = new TextField("Organization Code");
+    private final ComboBox<OrganizationType> type = new ComboBox<>("Organization Type");
+    private final ComboBox<OrganizationSummary> parent = new ComboBox<>("Parent Organization");
+    private final ComboBox<String> status = new ComboBox<>("Status");
+
+    /** The organization being edited, or {@code null} when adding a new one. */
+    private OrganizationSummary editing;
+
+    public AddOrganizationView(OrganizationService organizationService) {
+        this.organizationService = organizationService;
+        this.organizations = organizationService.findAll();
         setSizeFull();
         setPadding(true);
         setSpacing(true);
 
-        H2 title = new H2("Add Organization");
-        Span subtitle = new Span("Create a new organizational unit");
         subtitle.getStyle().set("color", "var(--lumo-secondary-text-color)");
 
         VerticalLayout header = new VerticalLayout(title, subtitle);
         header.setPadding(false);
         header.setSpacing(false);
 
-        TextField name = new TextField("Organization Name");
-        TextField code = new TextField("Organization Code");
+        name.setRequiredIndicatorVisible(true);
+        code.setRequiredIndicatorVisible(true);
 
-        ComboBox<String> type = new ComboBox<>("Organization Type");
-        type.setItems("Head Office", "Regional", "Branch", "Division", "Department", "Section", "Unit");
+        type.setItems(OrganizationType.values());
+        type.setItemLabelGenerator(OrganizationType::getLabel);
+        type.setRequiredIndicatorVisible(true);
 
-        ComboBox<String> parent = new ComboBox<>("Parent Organization");
-        parent.setItems("None", "Head Office", "Regional Jakarta", "Regional Bandung", "IT Division",
-                "Development Department", "Infrastructure Department");
-        parent.setValue("None");
+        parent.setItems(organizations.stream().filter(OrganizationSummary::active).toList());
+        parent.setItemLabelGenerator(org -> org.name() + " (" + org.code() + ")");
+        parent.setClearButtonVisible(true);
+        parent.setPlaceholder("None");
 
-        ComboBox<String> status = new ComboBox<>("Status");
-        status.setItems("Active", "Inactive");
-        status.setValue("Active");
+        status.setItems(ACTIVE, "Inactive");
+        status.setValue(ACTIVE);
 
         FlexLayout fields = twoColumnSection(name, code, type, parent, status);
 
         Button cancel = new Button("Cancel", event -> getUI().ifPresent(ui -> ui.navigate("organizations")));
 
-        Button save = new Button("Save Organization", event -> {
-            Notification.show("Saving organizations is a UI prototype only - no data is persisted.", 3000,
-                    Notification.Position.BOTTOM_START);
-            getUI().ifPresent(ui -> ui.navigate("organizations"));
-        });
+        Button save = new Button("Save Organization", event -> save());
         save.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
         HorizontalLayout actions = new HorizontalLayout(cancel, save);
@@ -79,6 +100,54 @@ public class AddOrganizationView extends VerticalLayout {
         form.setMaxWidth("960px");
 
         add(form);
+    }
+
+    @Override
+    public void setParameter(BeforeEvent event, @OptionalParameter String parameter) {
+        if (parameter == null) {
+            return;
+        }
+        editing = UrlIds.parse(parameter).flatMap(organizationService::findById).orElse(null);
+        if (editing == null) {
+            ViewNotifications.showError("Organization not found");
+            event.forwardTo("organizations");
+            return;
+        }
+
+        title.setText("Edit Organization");
+        subtitle.setText("Update organizational unit " + editing.name());
+        name.setValue(editing.name());
+        code.setValue(editing.code());
+        type.setValue(editing.type());
+        status.setValue(editing.active() ? ACTIVE : "Inactive");
+
+        // A unit cannot be its own parent; the service also rejects moving it under its own sub-units.
+        List<OrganizationSummary> parentChoices = organizations.stream()
+                .filter(org -> !org.id().equals(editing.id()))
+                .filter(org -> org.active() || org.id().equals(editing.parentId()))
+                .toList();
+        parent.setItems(parentChoices);
+        parentChoices.stream().filter(org -> org.id().equals(editing.parentId())).findFirst()
+                .ifPresent(parent::setValue);
+    }
+
+    private void save() {
+        OrganizationSummary selectedParent = parent.getValue();
+        OrganizationForm form = new OrganizationForm(
+                editing == null ? null : editing.id(),
+                editing == null ? null : editing.version(),
+                code.getValue(),
+                name.getValue(),
+                type.getValue(),
+                selectedParent == null ? null : selectedParent.id(),
+                ACTIVE.equals(status.getValue()));
+        try {
+            OrganizationSummary saved = organizationService.save(form);
+            ViewNotifications.showSuccess("Organization \"" + saved.name() + "\" saved");
+            getUI().ifPresent(ui -> ui.navigate("organizations"));
+        } catch (BusinessException e) {
+            ViewNotifications.showError(e.getMessage());
+        }
     }
 
     private Component sectionHeading(String text) {

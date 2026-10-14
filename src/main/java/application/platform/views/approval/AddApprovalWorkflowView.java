@@ -12,64 +12,92 @@ import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.Hr;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.VaadinIcon;
-import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.FlexLayout;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
+import com.vaadin.flow.router.BeforeEvent;
+import com.vaadin.flow.router.HasUrlParameter;
+import com.vaadin.flow.router.OptionalParameter;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
+import com.vaadin.flow.router.RouteAlias;
 
+import application.platform.approval.ApprovalStepForm;
+import application.platform.approval.ApprovalStepSummary;
+import application.platform.approval.ApprovalWorkflowForm;
+import application.platform.approval.ApprovalWorkflowService;
+import application.platform.approval.ApprovalWorkflowSummary;
+import application.platform.approval.ApproverType;
+import application.platform.common.BusinessException;
+import application.platform.module.ModuleService;
+import application.platform.module.ModuleSummary;
+import application.platform.role.RoleService;
+import application.platform.role.RoleSummary;
 import application.platform.views.MainLayout;
+import application.platform.views.UrlIds;
+import application.platform.views.ViewNotifications;
 
 import jakarta.annotation.security.PermitAll;
 
 @Route(value = "approval/workflows/add", layout = MainLayout.class)
+@RouteAlias(value = "approval/workflows/edit", layout = MainLayout.class)
 @PageTitle("Add Approval Workflow")
 @PermitAll
-public class AddApprovalWorkflowView extends VerticalLayout {
+public class AddApprovalWorkflowView extends VerticalLayout implements HasUrlParameter<String> {
 
-    private static final List<String> APPROVER_ROLES = List.of("Super Admin", "Admin", "Director", "Manager", "SPV",
-            "Staff");
+    private static final String ACTIVE = "Active";
 
-    private record StepRow(HorizontalLayout layout, Span label) {
+    private record StepRow(HorizontalLayout layout, Span label, ComboBox<ApproverType> approverType,
+            ComboBox<RoleSummary> role) {
     }
 
+    private final ApprovalWorkflowService workflowService;
+    private final List<ModuleSummary> allModules;
+    private final List<RoleSummary> allRoles;
+
+    private final H2 title = new H2("Add Approval Workflow");
+    private final Span subtitle = new Span("Create a new approval workflow");
+    private final TextField name = new TextField("Workflow Name");
+    private final ComboBox<ModuleSummary> module = new ComboBox<>("Module");
+    private final ComboBox<String> status = new ComboBox<>("Status");
+    private final TextArea description = new TextArea("Description");
     private final List<StepRow> stepRows = new ArrayList<>();
     private final VerticalLayout stepsContainer = new VerticalLayout();
 
-    public AddApprovalWorkflowView() {
+    /** The workflow being edited, or {@code null} when adding a new one. */
+    private ApprovalWorkflowSummary editing;
+
+    public AddApprovalWorkflowView(ApprovalWorkflowService workflowService, ModuleService moduleService,
+            RoleService roleService) {
+        this.workflowService = workflowService;
+        this.allModules = moduleService.findAll();
+        this.allRoles = roleService.findAll();
         setSizeFull();
         setPadding(true);
         setSpacing(true);
 
-        H2 title = new H2("Add Approval Workflow");
-        Span subtitle = new Span("Create a new approval workflow");
         subtitle.getStyle().set("color", "var(--lumo-secondary-text-color)");
 
         VerticalLayout header = new VerticalLayout(title, subtitle);
         header.setPadding(false);
         header.setSpacing(false);
 
-        TextField name = new TextField("Workflow Name");
+        name.setRequiredIndicatorVisible(true);
 
-        ComboBox<String> module = new ComboBox<>("Module");
-        module.setItems("Finance", "Invoice", "Stock", "Product", "Report");
+        module.setRequiredIndicatorVisible(true);
+        module.setItems(allModules.stream().filter(ModuleSummary::active).toList());
+        module.setItemLabelGenerator(ModuleSummary::name);
 
-        ComboBox<String> status = new ComboBox<>("Status");
-        status.setItems("Active", "Inactive");
-        status.setValue("Active");
-
-        TextArea description = new TextArea("Description");
+        status.setItems(ACTIVE, "Inactive");
+        status.setValue(ACTIVE);
 
         FlexLayout fields = twoColumnSection(name, module, status, description);
 
         stepsContainer.setPadding(false);
         stepsContainer.setSpacing(true);
-        addStepRow("SPV");
-        addStepRow("Manager");
-        addStepRow("Director");
+        addStepRow(null);
 
         Button addStep = new Button("Add Step", VaadinIcon.PLUS.create(), event -> addStepRow(null));
 
@@ -79,11 +107,7 @@ public class AddApprovalWorkflowView extends VerticalLayout {
 
         Button cancel = new Button("Cancel", event -> getUI().ifPresent(ui -> ui.navigate("approval/workflows")));
 
-        Button save = new Button("Save Workflow", event -> {
-            Notification.show("Saving workflows is a UI prototype only - no data is persisted.", 3000,
-                    Notification.Position.BOTTOM_START);
-            getUI().ifPresent(ui -> ui.navigate("approval/workflows"));
-        });
+        Button save = new Button("Save Workflow", event -> save());
         save.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
         HorizontalLayout actions = new HorizontalLayout(cancel, save);
@@ -101,14 +125,62 @@ public class AddApprovalWorkflowView extends VerticalLayout {
         add(form);
     }
 
-    private void addStepRow(String defaultRole) {
-        ComboBox<String> approverRole = new ComboBox<>();
-        approverRole.setItems(APPROVER_ROLES);
-        approverRole.setPlaceholder("Approver Role");
-        if (defaultRole != null) {
-            approverRole.setValue(defaultRole);
+    @Override
+    public void setParameter(BeforeEvent event, @OptionalParameter String parameter) {
+        if (parameter == null) {
+            return;
         }
-        approverRole.getStyle().set("flex", "1 1 220px").set("min-width", "200px");
+        editing = UrlIds.parse(parameter).flatMap(workflowService::findById).orElse(null);
+        if (editing == null) {
+            ViewNotifications.showError("Approval workflow not found");
+            event.forwardTo("approval/workflows");
+            return;
+        }
+
+        title.setText("Edit Approval Workflow");
+        subtitle.setText("Update workflow " + editing.name());
+        name.setValue(editing.name());
+        List<ModuleSummary> moduleChoices = allModules.stream()
+                .filter(choice -> choice.active() || choice.id().equals(editing.moduleId()))
+                .toList();
+        module.setItems(moduleChoices);
+        moduleChoices.stream().filter(choice -> choice.id().equals(editing.moduleId())).findFirst()
+                .ifPresent(module::setValue);
+        status.setValue(editing.active() ? ACTIVE : "Inactive");
+        description.setValue(editing.description() == null ? "" : editing.description());
+
+        new ArrayList<>(stepRows).forEach(this::removeStepRow);
+        editing.steps().forEach(this::addStepRow);
+    }
+
+    private void addStepRow(ApprovalStepSummary step) {
+        ComboBox<ApproverType> approverType = new ComboBox<>();
+        approverType.setItems(ApproverType.values());
+        approverType.setItemLabelGenerator(ApproverType::getLabel);
+        approverType.setPlaceholder("Approver Type");
+        approverType.getStyle().set("flex", "1 1 260px").set("min-width", "220px");
+
+        ComboBox<RoleSummary> role = new ComboBox<>();
+        role.setItems(allRoles.stream()
+                .filter(choice -> choice.active() || (step != null && choice.id().equals(step.roleId())))
+                .toList());
+        role.setItemLabelGenerator(RoleSummary::name);
+        role.setPlaceholder("Approver Role");
+        role.getStyle().set("flex", "1 1 220px").set("min-width", "200px");
+
+        approverType.addValueChangeListener(event -> {
+            boolean needsRole = event.getValue() == null || event.getValue().needsRole();
+            role.setEnabled(needsRole);
+            if (!needsRole) {
+                role.clear();
+            }
+        });
+
+        if (step != null) {
+            approverType.setValue(step.approverType());
+            allRoles.stream().filter(choice -> choice.id().equals(step.roleId())).findFirst()
+                    .ifPresent(role::setValue);
+        }
 
         Span stepLabel = new Span();
         stepLabel.getStyle().set("font-weight", "600").set("min-width", "70px");
@@ -117,11 +189,10 @@ public class AddApprovalWorkflowView extends VerticalLayout {
         row.setWidthFull();
         row.setAlignItems(HorizontalLayout.Alignment.CENTER);
 
-        StepRow stepRow = new StepRow(row, stepLabel);
+        StepRow stepRow = new StepRow(row, stepLabel, approverType, role);
         Button remove = new Button(VaadinIcon.TRASH.create(), event -> removeStepRow(stepRow));
 
-        row.add(stepLabel, approverRole, remove);
-        row.setFlexGrow(1, approverRole);
+        row.add(stepLabel, approverType, role, remove);
 
         stepRows.add(stepRow);
         stepsContainer.add(row);
@@ -137,6 +208,28 @@ public class AddApprovalWorkflowView extends VerticalLayout {
     private void renumberSteps() {
         for (int i = 0; i < stepRows.size(); i++) {
             stepRows.get(i).label().setText("Step " + (i + 1));
+        }
+    }
+
+    private void save() {
+        List<ApprovalStepForm> steps = stepRows.stream()
+                .map(row -> new ApprovalStepForm(row.approverType().getValue(),
+                        row.role().getValue() == null ? null : row.role().getValue().id()))
+                .toList();
+        ApprovalWorkflowForm form = new ApprovalWorkflowForm(
+                editing == null ? null : editing.id(),
+                editing == null ? null : editing.version(),
+                name.getValue(),
+                module.getValue() == null ? null : module.getValue().id(),
+                description.getValue(),
+                ACTIVE.equals(status.getValue()),
+                steps);
+        try {
+            ApprovalWorkflowSummary saved = workflowService.save(form);
+            ViewNotifications.showSuccess("Workflow \"" + saved.name() + "\" saved");
+            getUI().ifPresent(ui -> ui.navigate("approval/workflows"));
+        } catch (BusinessException e) {
+            ViewNotifications.showError(e.getMessage());
         }
     }
 

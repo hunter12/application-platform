@@ -14,6 +14,12 @@ import com.vaadin.flow.component.treegrid.TreeGrid;
 import com.vaadin.flow.data.provider.hierarchy.TreeDataProvider;
 import com.vaadin.flow.spring.security.AuthenticationContext;
 
+import application.platform.views.approval.AddApprovalRuleView;
+import application.platform.views.approval.AddApprovalWorkflowView;
+import application.platform.views.approval.AddDelegationView;
+import application.platform.views.approval.ApprovalRuleView;
+import application.platform.views.approval.ApprovalWorkflowView;
+import application.platform.views.approval.DelegationView;
 import application.platform.views.organization.AddOrganizationView;
 import application.platform.views.organization.OrganizationHierarchyView;
 import application.platform.views.organization.OrganizationView;
@@ -45,6 +51,15 @@ class AdministrationViewsTest extends SpringBrowserlessTest {
 
         navigate(OrganizationView.class);
         assertThat(gridSize()).isEqualTo(10);
+
+        navigate(ApprovalWorkflowView.class);
+        assertThat(gridSize()).isZero();
+
+        navigate(ApprovalRuleView.class);
+        assertThat(gridSize()).isZero();
+
+        navigate(DelegationView.class);
+        assertThat(gridSize()).isZero();
     }
 
     @Test
@@ -62,6 +77,12 @@ class AdministrationViewsTest extends SpringBrowserlessTest {
         navigate(AddRoleView.class);
         navigate(AddPermissionView.class);
         navigate(AddOrganizationView.class);
+        navigate(AddApprovalWorkflowView.class);
+        navigate("approval/workflows/edit/not-a-uuid", ApprovalWorkflowView.class);
+        navigate(AddApprovalRuleView.class);
+        navigate("approval/rules/edit/not-a-uuid", ApprovalRuleView.class);
+        navigate(AddDelegationView.class);
+        navigate("approval/delegation/edit/not-a-uuid", DelegationView.class);
 
         navigate("users", UsersView.class);
         @SuppressWarnings("unchecked")

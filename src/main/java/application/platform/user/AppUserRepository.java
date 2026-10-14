@@ -1,5 +1,6 @@
 package application.platform.user;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -12,6 +13,8 @@ public interface AppUserRepository extends JpaRepository<AppUser, UUID> {
     Optional<AppUser> findByUsername(String username);
 
     List<AppUser> findBySupervisorId(UUID supervisorId);
+
+    List<AppUser> findByOrganizationIdIn(Collection<UUID> organizationIds);
 
     /** All users with organization and supervisor loaded, for list pages. */
     @Query("""

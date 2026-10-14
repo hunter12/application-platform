@@ -1,6 +1,6 @@
 # Catatan Progres — Application Platform
 
-Terakhir diperbarui: 9 Oktober 2026
+Terakhir diperbarui: 13 Oktober 2026
 
 ## Cara menjalankan di lokal
 
@@ -12,7 +12,7 @@ $env:JAVA_HOME = "C:\Users\10101804\Downloads\jdk-21.0.12_windows-x64_bin\jdk-21
 - Buka http://localhost:8080, login `admin` / `admin123`
 - `JAVA_HOME` belum di-set permanen di laptop. Tanpa baris pertama, Maven memakai JRE dan gagal compile.
   Sebaiknya set permanen di Environment Variables Windows, dan pindahkan JDK keluar dari folder Downloads.
-- Menjalankan test: `.\mvnw.cmd test` (30 test, semua lulus)
+- Menjalankan test: `.\mvnw.cmd test` (43 test, semua lulus)
 
 ### Melihat isi database
 - Buka http://localhost:8080/h2-console (harus login aplikasi dulu)
@@ -25,8 +25,8 @@ $env:JAVA_HOME = "C:\Users\10101804\Downloads\jdk-21.0.12_windows-x64_bin\jdk-21
 
 ### 1. GitHub
 - Remote `origin` → https://github.com/hunter12/application-platform.git
-- Commit `86711c3` sudah dibuat, tapi **belum di-push**. Perlu login GitHub sekali: `git push -u origin main`
-- Semua pekerjaan setelah commit itu **belum di-commit**
+- Semua commit sudah dibuat (termasuk Approval Workflows, Approval Rules, dan Delegation), tapi **belum di-push**.
+  Perlu login GitHub sekali: `git push -u origin main`
 
 ### 2. Database H2 (mode file)
 - Dependency: `spring-boot-starter-data-jpa`, `h2`, `spring-boot-h2console` (Boot 4 memisahkan H2 console jadi modul sendiri)
@@ -54,11 +54,17 @@ $env:JAVA_HOME = "C:\Users\10101804\Downloads\jdk-21.0.12_windows-x64_bin\jdk-21
 | `permissions` | — |
 | `user_roles` | user, role, organization (scope, opsional). Satu user bisa punya banyak role. |
 | `role_permissions` | role, permission |
+| `modules` | — (master modul: Finance, Invoice, Stock, Product, Report) |
+| `approval_workflows` | `module_id` → modules |
+| `approval_workflow_steps` | `workflow_id` → approval_workflows, `role_id` → roles (kosong untuk Atasan langsung) |
+| `approval_rules` | `module_id` → modules, `workflow_id` → approval_workflows |
+| `delegations` | `delegator_id` → users, `delegate_id` → users |
 
 ### 5. Login dari database
 - Password disimpan sebagai BCrypt hash
 - Role menjadi `ROLE_<code>`, permission menjadi kodenya (contoh `INVOICE_APPROVE`)
 - User nonaktif tidak bisa login. User yang sudah dihapus dianggap tidak ada.
+- Seed modul (`ModuleSeeder`) jalan di semua profile, hanya kalau tabel `modules` kosong. Belum ada halaman admin untuk modul.
 - Seed data dev (`DevDataSeeder`), hanya jalan kalau tabel `users` kosong: 10 organisasi, 6 role, 12 permission, user `admin` (Super Admin)
 
 ### 6. Halaman yang sudah terhubung ke database
@@ -69,6 +75,9 @@ $env:JAVA_HOME = "C:\Users\10101804\Downloads\jdk-21.0.12_windows-x64_bin\jdk-21
 | Users | daftar + kolom Roles, tambah, edit, hapus (soft delete) |
 | Roles | daftar + jumlah user, tambah, edit, aktif/nonaktif, **View Access** (atur permission per role) |
 | Permissions | daftar, filter, tambah, edit, aktif/nonaktif |
+| Approval Workflows | daftar, filter modul/status, tambah, edit (termasuk step), View step, aktif/nonaktif |
+| Approval Rules | daftar, filter modul/status, tambah, edit, aktif/nonaktif |
+| Delegation | daftar, filter status, tambah, edit (hanya Scheduled), View, Cancel |
 
 Perubahan form dibanding UI lama:
 - Add User: tambah field **Password**, Role jadi **multi-select**, kolom email dan phone ditambahkan ke tabel
@@ -96,6 +105,27 @@ Aturan yang dijaga sistem:
 4. **Rule nominal**: `min_amount` dan `max_amount` wajib diisi, keduanya inklusif dengan selisih 0,01
    (contoh: 0–10.000.000 / 10.000.000,01–100.000.000 / 100.000.000,01–9.999.999.999.999,99)
 5. **Cukup `is_active`**, tanpa jadwal aktivasi (`effective_from/to`)
+6. **Module diambil dari tabel `modules`**, dipilih lewat dropdown, tidak boleh teks bebas
+7. **Tipe approver**: Atasan langsung pemohon / Role di organisasi pemohon / Role di organisasi induk.
+   "Organisasi induk" artinya naik terus sampai ketemu organisasi yang punya user dengan role itu.
+8. **Pengajuan tidak bisa diedit** setelah diajukan. Kalau salah, approver Reject, lalu pemohon perbaiki dan ajukan ulang.
+9. **Workflow dikunci selama masih ada pengajuan pending.** Pengajuan langsung memakai step workflow, tanpa salinan.
+   Pengecekan ini ditambahkan saat tabel pengajuan dibuat.
+10. **Approval Rule tanpa priority**: rentang nominal rule aktif dalam satu modul tidak boleh tumpang tindih,
+    jadi satu nominal pasti hanya cocok ke satu rule.
+11. **Celah nominal dibolehkan.** Kalau saat pengajuan tidak ada rule yang cocok, pengajuan ditolak
+    ("Belum ada approval rule untuk nominal ini").
+12. **Semua nominal dalam Rupiah**, decimal(15,2)
+13. Workflow rule harus dari **modul yang sama**. Workflow yang dipakai rule aktif tidak bisa dinonaktifkan,
+    dan modul workflow tidak bisa diganti kalau sudah dipakai rule.
+14. **Delegation**: status dihitung dari tanggal (Scheduled / Active / Completed), Cancelled dari `cancelled_date`.
+    - Edit hanya selama Scheduled. Active hanya bisa Cancel. Completed/Cancelled tidak bisa diubah.
+    - Tanggal mulai tidak boleh sebelum hari ini
+    - Berlaku untuk semua modul
+    - Satu pemberi tidak boleh punya dua delegasi yang periodenya tumpang tindih
+    - Tidak berantai: penerima tidak boleh sedang mendelegasikan, dan pemberi tidak boleh sedang menjadi penerima,
+      di periode yang sama
+    - Admin input untuk siapa saja. User input untuk diri sendiri menunggu pembatasan akses per permission.
 
 ---
 
@@ -103,13 +133,9 @@ Aturan yang dijaga sistem:
 
 Hapus semua data mock yang tersisa dan hubungkan ke tabel:
 
-- [ ] **Approval Workflows**: tabel `approval_workflows` + `approval_workflow_steps`
-  - Step: urutan, tipe approver (Atasan langsung pemohon / Role di organisasi pemohon / Role di organisasi induk), role
-- [ ] **Approval Rules**: tabel `approval_rules` (module, min_amount, max_amount, workflow, priority)
-  - Condition Type disederhanakan jadi **Amount Range** saja
-  - Validasi: rentang nominal dalam satu modul tidak boleh tumpang tindih
-- [ ] **Delegation**: tabel `delegations` (delegator, delegate, start_date, end_date, reason)
-  - Status dihitung dari tanggal: Scheduled / Active / Completed. Cancelled = tombol Cancel.
+- [x] **Approval Workflows**: tabel `modules`, `approval_workflows`, `approval_workflow_steps`
+- [x] **Approval Rules**: tabel `approval_rules`
+- [x] **Delegation**: tabel `delegations`
 - [ ] **Notifications**: tabel `notifications`, per user (hanya melihat milik sendiri), Mark as Read, Delete
   - Add Notification = admin mengirim pengumuman ke satu user
 - [ ] **Notification Policy**: tabel `notification_policies` (untuk sekarang hanya disimpan sebagai pengaturan)
@@ -122,5 +148,7 @@ Hapus semua data mock yang tersisa dan hubungkan ke tabel:
 
 - [ ] Batasi akses halaman berdasarkan permission. Saat ini semua user yang login bisa membuka semua halaman admin.
 - [ ] Tabel pengajuan approval yang sebenarnya (request, riwayat approve/reject), supaya Pending Approvals berfungsi
+  - Tolak edit/nonaktifkan workflow selama masih ada pengajuan pending (keputusan no. 9)
+  - Tolak pengajuan kalau tidak ada rule yang cocok (keputusan no. 11)
 - [ ] Database untuk production (misalnya PostgreSQL). Profile `prod` belum punya konfigurasi database.
 - [ ] Commit dan push ke GitHub

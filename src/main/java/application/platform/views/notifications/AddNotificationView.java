@@ -8,7 +8,6 @@ import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.Hr;
 import com.vaadin.flow.component.html.Span;
-import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.FlexLayout;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
@@ -17,7 +16,15 @@ import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 
+import application.platform.common.BusinessException;
+import application.platform.notification.Notification;
+import application.platform.notification.NotificationForm;
+import application.platform.notification.NotificationService;
+import application.platform.notification.NotificationType;
+import application.platform.user.UserService;
+import application.platform.user.UserSummary;
 import application.platform.views.MainLayout;
+import application.platform.views.ViewNotifications;
 
 import jakarta.annotation.security.PermitAll;
 
@@ -26,41 +33,49 @@ import jakarta.annotation.security.PermitAll;
 @PermitAll
 public class AddNotificationView extends VerticalLayout {
 
-    public AddNotificationView() {
+    private final NotificationService notificationService;
+
+    private final TextField titleField = new TextField("Title");
+    private final ComboBox<NotificationType> type = new ComboBox<>("Notification Type");
+    private final ComboBox<UserSummary> recipient = new ComboBox<>("Recipient");
+    private final TextArea message = new TextArea("Message");
+
+    public AddNotificationView(NotificationService notificationService, UserService userService) {
+        this.notificationService = notificationService;
         setSizeFull();
         setPadding(true);
         setSpacing(true);
 
         H2 title = new H2("Add Notification");
-        Span subtitle = new Span("Create a new system notification");
+        Span subtitle = new Span("Send an announcement to one user");
         subtitle.getStyle().set("color", "var(--lumo-secondary-text-color)");
 
         VerticalLayout header = new VerticalLayout(title, subtitle);
         header.setPadding(false);
         header.setSpacing(false);
 
-        TextField titleField = new TextField("Title");
-        TextArea message = new TextArea("Message");
+        titleField.setRequiredIndicatorVisible(true);
+        titleField.setMaxLength(Notification.TITLE_MAX_LENGTH);
 
-        ComboBox<String> type = new ComboBox<>("Notification Type");
-        type.setItems("Approval", "Delegation", "System", "Information");
+        type.setRequiredIndicatorVisible(true);
+        type.setItems(NotificationType.manualTypes());
+        type.setItemLabelGenerator(NotificationType::getLabel);
+        type.setValue(NotificationType.INFORMATION);
 
-        ComboBox<String> recipient = new ComboBox<>("Recipient");
-        recipient.setItems("Abu Yazid", "John Smith", "Jane Doe", "Budi");
+        recipient.setRequiredIndicatorVisible(true);
+        recipient.setItems(userService.findAll().stream().filter(UserSummary::active).toList());
+        recipient.setItemLabelGenerator(user -> user.fullName() + " (" + user.organizationName() + ")");
 
-        ComboBox<String> status = new ComboBox<>("Status");
-        status.setItems("Unread", "Read");
-        status.setValue("Unread");
+        message.setRequiredIndicatorVisible(true);
+        message.setMaxLength(Notification.MESSAGE_MAX_LENGTH);
+        message.setHelperText("Up to " + Notification.MESSAGE_MAX_LENGTH + " characters");
+        message.setMinHeight("8rem");
 
-        FlexLayout fields = twoColumnSection(titleField, type, recipient, status, message);
+        FlexLayout fields = twoColumnSection(titleField, type, recipient, message);
 
         Button cancel = new Button("Cancel", event -> getUI().ifPresent(ui -> ui.navigate("notifications")));
 
-        Button save = new Button("Save Notification", event -> {
-            Notification.show("Saving notifications is a UI prototype only - no data is persisted.", 3000,
-                    Notification.Position.BOTTOM_START);
-            getUI().ifPresent(ui -> ui.navigate("notifications"));
-        });
+        Button save = new Button("Send Notification", event -> save());
         save.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
         HorizontalLayout actions = new HorizontalLayout(cancel, save);
@@ -74,6 +89,21 @@ public class AddNotificationView extends VerticalLayout {
         form.setMaxWidth("960px");
 
         add(form);
+    }
+
+    private void save() {
+        NotificationForm form = new NotificationForm(
+                recipient.getValue() == null ? null : recipient.getValue().id(),
+                type.getValue(),
+                titleField.getValue(),
+                message.getValue());
+        try {
+            notificationService.send(form);
+            ViewNotifications.showSuccess("Notification sent to " + recipient.getValue().fullName());
+            getUI().ifPresent(ui -> ui.navigate("notifications"));
+        } catch (BusinessException e) {
+            ViewNotifications.showError(e.getMessage());
+        }
     }
 
     private Component sectionHeading(String text) {

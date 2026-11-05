@@ -11,11 +11,14 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.Scroller;
 import com.vaadin.flow.component.sidenav.SideNav;
 import com.vaadin.flow.component.sidenav.SideNavItem;
+import com.vaadin.flow.router.AfterNavigationEvent;
+import com.vaadin.flow.router.AfterNavigationObserver;
 import com.vaadin.flow.router.RouterLayout;
 import com.vaadin.flow.spring.security.AuthenticationContext;
 
 import jakarta.annotation.security.PermitAll;
 
+import application.platform.notification.NotificationService;
 import application.platform.views.approval.ApprovalRuleView;
 import application.platform.views.approval.ApprovalWorkflowView;
 import application.platform.views.approval.DelegationView;
@@ -32,11 +35,26 @@ import application.platform.views.roles.RoleView;
 import application.platform.views.users.UsersView;
 
 @PermitAll
-public class MainLayout extends AppLayout implements RouterLayout {
+public class MainLayout extends AppLayout implements RouterLayout, AfterNavigationObserver {
 
-    public MainLayout(AuthenticationContext authenticationContext) {
+    private final NotificationService notificationService;
+    private final Span unreadBadge = new Span();
+
+    public MainLayout(AuthenticationContext authenticationContext, NotificationService notificationService) {
+        this.notificationService = notificationService;
         addToNavbar(buildHeader(authenticationContext));
         addToDrawer(new Scroller(buildNavigation()));
+    }
+
+    @Override
+    public void afterNavigation(AfterNavigationEvent event) {
+        refreshUnreadCount();
+    }
+
+    public void refreshUnreadCount() {
+        long unread = notificationService.countMyUnread();
+        unreadBadge.setText(unread > 99 ? "99+" : String.valueOf(unread));
+        unreadBadge.setVisible(unread > 0);
     }
 
     private HorizontalLayout buildHeader(AuthenticationContext authenticationContext) {
@@ -88,7 +106,17 @@ public class MainLayout extends AppLayout implements RouterLayout {
         nav.addItem(approval);
 
         SideNavItem notification = new SideNavItem("Notification");
-        notification.addItem(new SideNavItem("Notifications", NotificationView.class));
+        SideNavItem notifications = new SideNavItem("Notifications", NotificationView.class);
+        unreadBadge.getStyle()
+                .set("padding", "0 0.5em")
+                .set("border-radius", "1em")
+                .set("font-size", "0.75em")
+                .set("font-weight", "600")
+                .set("background", "#1a56db")
+                .set("color", "#ffffff");
+        unreadBadge.setVisible(false);
+        notifications.setSuffixComponent(unreadBadge);
+        notification.addItem(notifications);
         notification.addItem(new SideNavItem("Notification Policy", NotificationPolicyView.class));
         nav.addItem(notification);
 

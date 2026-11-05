@@ -20,6 +20,8 @@ import application.platform.views.approval.AddDelegationView;
 import application.platform.views.approval.ApprovalRuleView;
 import application.platform.views.approval.ApprovalWorkflowView;
 import application.platform.views.approval.DelegationView;
+import application.platform.views.notifications.AddNotificationView;
+import application.platform.views.notifications.NotificationView;
 import application.platform.views.organization.AddOrganizationView;
 import application.platform.views.organization.OrganizationHierarchyView;
 import application.platform.views.organization.OrganizationView;
@@ -83,6 +85,8 @@ class AdministrationViewsTest extends SpringBrowserlessTest {
         navigate("approval/rules/edit/not-a-uuid", ApprovalRuleView.class);
         navigate(AddDelegationView.class);
         navigate("approval/delegation/edit/not-a-uuid", DelegationView.class);
+        navigate(NotificationView.class);
+        navigate(AddNotificationView.class);
 
         navigate("users", UsersView.class);
         @SuppressWarnings("unchecked")

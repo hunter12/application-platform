@@ -1,6 +1,6 @@
 # Catatan Progres — Application Platform
 
-Terakhir diperbarui: 13 Oktober 2026
+Terakhir diperbarui: 14 Oktober 2026
 
 ## Cara menjalankan di lokal
 
@@ -12,7 +12,7 @@ $env:JAVA_HOME = "C:\Users\10101804\Downloads\jdk-21.0.12_windows-x64_bin\jdk-21
 - Buka http://localhost:8080, login `admin` / `admin123`
 - `JAVA_HOME` belum di-set permanen di laptop. Tanpa baris pertama, Maven memakai JRE dan gagal compile.
   Sebaiknya set permanen di Environment Variables Windows, dan pindahkan JDK keluar dari folder Downloads.
-- Menjalankan test: `.\mvnw.cmd test` (43 test, semua lulus)
+- Menjalankan test: `.\mvnw.cmd test` (46 test, semua lulus)
 
 ### Melihat isi database
 - Buka http://localhost:8080/h2-console (harus login aplikasi dulu)
@@ -59,6 +59,7 @@ $env:JAVA_HOME = "C:\Users\10101804\Downloads\jdk-21.0.12_windows-x64_bin\jdk-21
 | `approval_workflow_steps` | `workflow_id` → approval_workflows, `role_id` → roles (kosong untuk Atasan langsung) |
 | `approval_rules` | `module_id` → modules, `workflow_id` → approval_workflows |
 | `delegations` | `delegator_id` → users, `delegate_id` → users |
+| `notifications` | `recipient_id` → users (wajib), `sender_id` → users (kosong = dari sistem) |
 
 ### 5. Login dari database
 - Password disimpan sebagai BCrypt hash
@@ -78,8 +79,11 @@ $env:JAVA_HOME = "C:\Users\10101804\Downloads\jdk-21.0.12_windows-x64_bin\jdk-21
 | Approval Workflows | daftar, filter modul/status, tambah, edit (termasuk step), View step, aktif/nonaktif |
 | Approval Rules | daftar, filter modul/status, tambah, edit, aktif/nonaktif |
 | Delegation | daftar, filter status, tambah, edit (hanya Scheduled), View, Cancel |
+| Notifications | inbox milik sendiri, cari/filter tipe & status, View (otomatis Read), Mark as Read, Mark all as read, Delete, Add (kirim pengumuman) |
 
 Perubahan form dibanding UI lama:
+- Add Notification: field Status dibuang (selalu Unread), tipe hanya System / Information
+- Menu samping: badge jumlah notifikasi unread di "Notifications"
 - Add User: tambah field **Password**, Role jadi **multi-select**, kolom email dan phone ditambahkan ke tabel
 - Add Role: tambah **Role Code** (tidak bisa diubah setelah dibuat)
 - Permission: kolom `name` ditambahkan. Code tidak bisa diubah setelah dibuat.
@@ -91,7 +95,7 @@ Aturan yang dijaga sistem:
 - Role/permission yang dicabut hanya dinonaktifkan, tidak dihapus (jejak audit tetap ada)
 
 ### 7. Bersih-bersih
-- File mock untuk Users, Roles, Permissions, dan Organizations dihapus
+- File mock untuk Users, Roles, Permissions, Organizations, Approval, Delegation, dan Notifications dihapus
 - Komentar di bagian atas setiap class dan file properties dihapus
 - File log `run-err*.log` dan `run-out*.log` dihapus, dan `*.log` ditambahkan ke `.gitignore`
 
@@ -126,6 +130,12 @@ Aturan yang dijaga sistem:
     - Tidak berantai: penerima tidak boleh sedang mendelegasikan, dan pemberi tidak boleh sedang menjadi penerima,
       di periode yang sama
     - Admin input untuk siapa saja. User input untuk diri sendiri menunggu pembatasan akses per permission.
+15. **Notifications**
+    - Setiap user (termasuk admin) hanya melihat dan mengubah notifikasi miliknya sendiri
+    - Status Read dari `read_date`, Mark as Read satu arah (tidak ada Mark as Unread)
+    - Tidak bisa diedit setelah dikirim. Delete = soft delete.
+    - Kirim manual hanya tipe System / Information, ke satu user aktif. Approval / Delegation dibuat otomatis oleh sistem.
+    - Notifikasi otomatis untuk delegasi (dibuat/di-cancel) ditunda sampai Notification Policy
 
 ---
 
@@ -136,8 +146,7 @@ Hapus semua data mock yang tersisa dan hubungkan ke tabel:
 - [x] **Approval Workflows**: tabel `modules`, `approval_workflows`, `approval_workflow_steps`
 - [x] **Approval Rules**: tabel `approval_rules`
 - [x] **Delegation**: tabel `delegations`
-- [ ] **Notifications**: tabel `notifications`, per user (hanya melihat milik sendiri), Mark as Read, Delete
-  - Add Notification = admin mengirim pengumuman ke satu user
+- [x] **Notifications**: tabel `notifications`
 - [ ] **Notification Policy**: tabel `notification_policies` (untuk sekarang hanya disimpan sebagai pengaturan)
 - [ ] **Audit Log**: tabel `audit_logs`, **diisi otomatis** (create/update/delete + login berhasil/gagal), hanya bisa dibaca
   - Filter tanggal diganti date picker
